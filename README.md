@@ -63,6 +63,17 @@ CEF 运行时（约 1.5 GB）不随仓库分发，`scripts/fetch-deps.sh` 会一
 | <img src="https://icons.zhiyuhub.top/i/bug_report?color=6750a4&type=rounded&shape=rounded&size=28" height="26" alt=""> | **调试** | 一键开 DevTools，或 `--inspect` 接 CDP 工具 |
 | <img src="https://icons.zhiyuhub.top/i/swap_horiz?color=6750a4&type=rounded&shape=rounded&size=28" height="26" alt=""> | **双向事件** | C++ 主动推事件给页面，页面订阅、广播 |
 
+## 安装
+
+Arch Linux 用户直接从 AUR 装：
+
+```bash
+yay -S yati        # 或 paru -S yati
+yati               # 默认以沙箱模式启动
+```
+
+其他发行版走下面的源码构建。
+
 ## 跑起来
 
 ```bash
