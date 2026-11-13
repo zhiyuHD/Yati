@@ -1,0 +1,27 @@
+# 构建产物
+build/
+build-*/
+_build/
+
+# 依赖：CEF 分发包、cmake/ninja 工具链都由 scripts/fetch-deps.sh 下载，不进版本库
+vendor/
+
+# 下载残留
+*.tar.bz2
+*.tar.gz
+*.zip
+
+# 编译中间物
+*.o
+*.a
+*.so
+compile_commands.json
+
+# Python
+__pycache__/
+*.pyc
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Yati · API 实验台</title>
+  <script src="preload.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101317;
+      --panel: #171b21;
+      --line: #252b34;
+      --text: #e6e9ee;
+      --dim: #838d9b;
+      --accent: #5aa9ff;
+      --ok: #3fb950;
+      --warn: #d29922;
+      --err: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Noto Sans CJK SC", sans-serif;
+      font-size: 13.5px;
+    }
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 20px 24px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    header h1 { margin: 0; font-size: 19px; letter-spacing: .4px; }
+    header .sub { color: var(--dim); font-size: 12.5px; }
+    .badge {
+      margin-left: auto;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 11.5px;
+      color: var(--dim);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      padding: 16px 24px;
+    }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+    .stat .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
+    .stat .v { margin-top: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; word-break: break-all; }
+
+    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 0 24px 24px; }
+    @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+    section > h2 {
+      margin: 0;
+      padding: 11px 14px;
+      font-size: 12px;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--dim);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    section > h2 code { color: var(--accent); text-transform: none; font-size: 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; padding: 13px 14px; }
+
+    button {
+      background: #1f242c;
+      color: var(--text);
+      border: 1px solid #2d3542;
+      border-radius: 7px;
+      padding: 7px 12px;
+      font-size: 12.5px;
+      font-family: ui-monospace, Menlo, monospace;
+      cursor: pointer;
+      transition: background .12s ease, border-color .12s ease;
+    }
+    button:hover { background: #262d37; border-color: #3c4656; }
+    button:active { transform: translateY(1px); }
+    button.danger { color: #ff9d95; border-color: #4a2a2a; }
+    button.primary { color: #bcdcff; border-color: #2f4a6b; }
+
+    #logwrap { position: sticky; top: 14px; align-self: start; }
+    #log {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      height: calc(100vh - 120px);
+      overflow: auto;
+      padding: 12px 14px;
+      margin: 0;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .t { color: #5c6675; }
+    .req { color: var(--accent); }
+    .ok { color: var(--ok); }
+    .err { color: var(--err); }
+    .evt { color: var(--warn); }
+    .dim { color: var(--dim); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Yati</h1>
+    <span class="sub">API 实验台 · 所有调用都经 CEF 消息路由往返浏览器进程</span>
+    <span class="badge" id="version">connecting…</span>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Runtime</div><div class="v" id="s-app">—</div></div>
+    <div class="stat"><div class="k">CEF</div><div class="v" id="s-cef">—</div></div>
+    <div class="stat"><div class="k">Chromium</div><div class="v" id="s-chromium">—</div></div>
+    <div class="stat"><div class="k">Arch / kernel</div><div class="v" id="s-arch">—</div></div>
+    <div class="stat"><div class="k">User data</div><div class="v" id="s-userdata">—</div></div>
+    <div class="stat"><div class="k">Window id</div><div class="v" id="s-window">—</div></div>
+  </div>
+
+  <main>
+    <div>
+      <section>
+        <h2>自检 <code>selftest</code></h2>
+        <div class="row">
+          <button class="primary" data-act="selftest">▶ 重新运行自检</button>
+          <span class="dim" style="align-self:center">启动时自动执行一次，逐项覆盖各模块</span>
+        </div>
+      </section>
+
+      <section>
+        <h2><code>yati.app</code> 运行时信息</h2>
+        <div class="row">
+          <button data-act="app.info">app.info()</button>
+          <button data-act="app.paths">app.paths()</button>
+          <button data-act="app.channels">app.channels()</button>
+          <button data-act="app.broadcast">app.broadcast()</button>
+          <button class="danger" data-act="app.quit">app.quit()</button>
+        </div>
+      </section>
+
+      <section>
+        <h2><code>yati.window</code> 窗口控制</h2>
+        <div class="row">
+          <button data-act="win.state">getState()</button>
+          <button data-act="win.title">setTitle()</button>
+          <button data-act="win.bounds">setBounds()</button>
+          <button data-act="win.center">center()</button>
+          <button data-act="win.maximize">maximize()</button>
+          <button data-act="win.restore">restore()</button>
+          <button data-act="win.toggleTop">setAlwaysOnTop(toggle)</button>
+          <button class="primary" data-act="win.create">create() 新窗口</button>
+          <button data-act="win.list">list()</button>
+          <button data-act="win.minimize">minimize()</button>
+        </div>
+      </section>
+
+      <section>
+        <h2><code>yati.fs</code> 文件系统</h2>
+        <div class="row">
+          <button data-act="fs.roundtrip">写+读文本</button>
+          <button data-act="fs.dir">readDir(temp)</button>
+          <button data-act="fs.stat">stat()</button>
+          <button data-act="fs.json">writeJson + readJson</button>
+          <button data-act="fs.exists">exists()</button>
+          <button data-act="fs.remove">remove()</button>
+        </div>
+      </section>
+
+      <section>
+        <h2><code>yati.dialog</code> 原生对话框（异步应答）</h2>
+        <div class="row">
+          <button data-act="dlg.open">openFile()</button>
+          <button data-act="dlg.folder">openFolder()</button>
+          <button data-act="dlg.save">saveFile()</button>
+        </div>
+      </section>
+
+      <section>
+        <h2><code>yati.shell</code> · <code>yati.clipboard</code> · <code>yati.notify</code></h2>
+        <div class="row">
+          <button data-act="sh.exec">shell.exec(["uname","-a"])</button>
+          <button data-act="sh.exec2">shell.exec("echo $HOME")</button>
+          <button data-act="sh.reveal">showItemInFolder()</button>
+          <button data-act="clip.read">clipboard.readText()</button>
+          <button data-act="clip.write">clipboard.writeText()</button>
+          <button data-act="notify">notify.send()</button>
+        </div>
+      </section>
+
+      <section>
+        <h2><code>yati.session</code> · <code>yati.devtools</code></h2>
+        <div class="row">
+          <button data-act="cookie.set">cookies.set()</button>
+          <button data-act="cookie.get">cookies.get()</button>
+          <button data-act="cookie.clear">cookies.clear()</button>
+          <button data-act="dev.open">devtools.open()</button>
+          <button data-act="dev.state">devtools.isOpen()</button>
+          <button data-act="dev.close">devtools.close()</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="logwrap">
+      <pre id="log"></pre>
+    </div>
+  </main>
+
+  <script>
+    const logView = document.getElementById('log');
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+    function line(kind, text) {
+      const stamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      logView.insertAdjacentHTML(
+        'beforeend',
+        `<span class="t">${stamp}</span> <span class="${kind}">${esc(text)}</span>\n`,
+      );
+      logView.scrollTop = logView.scrollHeight;
+    }
+
+    function preview(value) {
+      const json = JSON.stringify(value);
+      if (json === undefined) return String(value);
+      return json.length > 320 ? json.slice(0, 320) + `… (${json.length} chars)` : json;
+    }
+
+    async function run(label, fn) {
+      line('req', `→ ${label}`);
+      try {
+        const result = await fn();
+        line('ok', `✓ ${label}: ${preview(result)}`);
+        return result;
+      } catch (error) {
+        line('err', `✗ ${label}: ${error.name}(${error.code ?? '-'}) ${error.message}`);
+        return undefined;
+      }
+    }
+
+    const tempFile = () => yati.fs.tempDir().then((dir) => dir + '/yati-playground.txt');
+
+    const actions = {
+      selftest: () => selfTest(),
+      'app.info': () => yati.app.info(),
+      'app.paths': () => yati.app.paths(),
+      'app.channels': async () => {
+        const channels = await yati.app.channels();
+        return channels.length + ' channels: ' + channels.join(', ');
+      },
+      'app.broadcast': () => yati.app.broadcast('demo:hello', { from: 'playground', at: Date.now() }),
+      'app.quit': () => yati.app.quit(),
+
+      'win.state': () => yati.window.getState(),
+      'win.title': () => yati.window.setTitle('Yati · ' + new Date().toLocaleTimeString('zh-CN', { hour12: false })),
+      'win.bounds': async () => {
+        const state = await yati.window.getState();
+        return yati.window.setBounds({ width: state.width > 1000 ? 900 : 1200, height: state.height });
+      },
+      'win.center': () => yati.window.center(),
+      'win.maximize': () => yati.window.maximize(),
+      'win.restore': () => yati.window.restore(),
+      'win.toggleTop': async () => {
+        actions._onTop = !actions._onTop;
+        return yati.window.setAlwaysOnTop(actions._onTop);
+      },
+      'win.create': () => yati.window.create({ title: 'Yati 子窗口', width: 760, height: 520 }),
+      'win.list': () => yati.window.list(),
+      'win.minimize': () => yati.window.minimize(),
+
+      'fs.roundtrip': async () => {
+        const file = await tempFile();
+        await yati.fs.writeText(file, 'hello Yati @ ' + new Date().toISOString());
+        return { file, content: await yati.fs.readText(file) };
+      },
+      'fs.dir': async () => {
+        const dir = await yati.fs.tempDir();
+        const listing = await yati.fs.readDir(dir);
+        return listing.entries.slice(0, 8).map((e) => (e.isDirectory ? e.name + '/' : e.name));
+      },
+      'fs.stat': async () => yati.fs.stat(await tempFile()),
+      'fs.json': async () => {
+        const file = (await yati.fs.tempDir()) + '/yati-playground.json';
+        await yati.fs.writeJson(file, { runtime: 'yati', api: yati.version, ok: true });
+        return yati.fs.readJson(file);
+      },
+      'fs.exists': async () => yati.fs.exists(await tempFile()),
+      'fs.remove': async () => yati.fs.remove(await tempFile(), false),
+
+      'dlg.open': () => yati.dialog.openFile({ title: '选择文件', multiple: true, filters: ['.txt', '.json'] }),
+      'dlg.folder': () => yati.dialog.openFolder({ title: '选择目录' }),
+      'dlg.save': async () => yati.dialog.saveFile({ title: '保存到', defaultPath: 'yati-demo.txt' }),
+
+      'sh.exec': () => yati.shell.exec(['uname', '-a']),
+      'sh.exec2': () => yati.shell.exec('echo "HOME=$HOME"; printf "从 shell 返回\\n"'),
+      'sh.reveal': async () => yati.shell.showItemInFolder(await tempFile()),
+      'clip.read': () => yati.clipboard.readText(),
+      'clip.write': () => yati.clipboard.writeText('Yati 已写入剪贴板 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false })),
+      notify: () => yati.notify.send('Yati 通知', '这是一条来自 C++ 的通知', { urgency: 'normal', expireMs: 4000 }),
+
+      'cookie.set': () =>
+        yati.session.cookies.set({ url: 'https://example.com', name: 'yati_demo', value: String(Date.now()) }),
+      'cookie.get': () => yati.session.cookies.get('https://example.com'),
+      'cookie.clear': () => yati.session.cookies.clear(),
+      'dev.open': () => yati.devtools.open(),
+      'dev.state': () => yati.devtools.isOpen(),
+      'dev.close': () => yati.devtools.close(),
+    };
+
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-act]');
+      if (!button) return;
+      const handler = actions[button.dataset.act];
+      if (handler) run(button.dataset.act, handler);
+    });
+
+    // Window lifecycle events pushed from C++.
+    for (const name of ['window:created', 'window:closed', 'window:closing', 'window:focus', 'window:blur', 'window:bounds', 'app:ready']) {
+      yati.on(name, (payload) => line('evt', `⚡ ${name} ${preview(payload)}`));
+    }
+    yati.on('demo:hello', (payload) => line('evt', `⚡ demo:hello ${preview(payload)}`));
+
+    // Runs every module once and logs the outcome, so a glance at the log shows
+    // which parts of the native API are alive.
+    async function selfTest() {
+      line('dim', '── 自检开始 ──');
+      const cases = [
+        ['app.info', () => yati.app.info()],
+        ['app.paths', () => yati.app.paths()],
+        ['app.channels', async () => (await yati.app.channels()).length + ' channels'],
+        ['window.getState', () => yati.window.getState()],
+        ['window.list', () => yati.window.list()],
+        ['fs.writeText', async () => yati.fs.writeText(await tempFile(), 'hello from the playground')],
+        ['fs.readText', async () => yati.fs.readText(await tempFile())],
+        ['fs.readDir', async () => (await yati.fs.readDir(await yati.fs.tempDir())).entries.length + ' entries'],
+        ['fs.writeJson+readJson', async () => {
+          const file = (await yati.fs.tempDir()) + '/yati-playground.json';
+          await yati.fs.writeJson(file, { runtime: 'yati', version: yati.version });
+          return yati.fs.readJson(file);
+        }],
+        ['clipboard.writeText', () => yati.clipboard.writeText('yati selftest ' + Date.now())],
+        ['clipboard.readText', () => yati.clipboard.readText()],
+        ['shell.exec', async () => {
+          const r = await yati.shell.exec(['uname', '-sr']);
+          return r.stdout.trim();
+        }],
+        ['session.cookies.set', () => yati.session.cookies.set({ url: 'https://example.com', name: 'yati_selftest', value: 'ok' })],
+        ['session.cookies.get', async () => {
+          const cookies = await yati.session.cookies.get('https://example.com');
+          return cookies.map((c) => c.name + '=' + c.value);
+        }],
+        ['devtools.isOpen', () => yati.devtools.isOpen()],
+      ];
+      let passed = 0;
+      for (const [label, fn] of cases) {
+        const result = await run(label, fn);
+        if (result !== undefined) passed += 1;
+      }
+      line(passed === cases.length ? 'ok' : 'err', `── 自检结束：${passed}/${cases.length} 通过 ──`);
+    }
+
+    // Boot: fill the header, then exercise the API once.
+    (async function boot() {
+      try {
+        const info = await yati.ready;
+        document.getElementById('version').textContent = 'yati ' + info.version + ' · cef ' + info.cef.split('+')[0];
+        document.getElementById('s-app').textContent = info.name + ' ' + info.version;
+        document.getElementById('s-cef').textContent = info.cef;
+        document.getElementById('s-chromium').textContent = 'r' + info.chromium;
+        document.getElementById('s-arch').textContent = (info.arch || '?') + ' / ' + (info.kernel || '?');
+        const paths = await yati.app.paths();
+        document.getElementById('s-userdata').textContent = paths.userData;
+        const state = await yati.window.getState();
+        document.getElementById('s-window').textContent = '#' + state.windowId;
+        line('ok', `✓ 运行时就绪：yati ${info.version} / cef ${info.cef}`);
+        line('dim', `   window #${state.windowId} ${state.width}×${state.height} @ (${state.x},${state.y})`);
+        await selfTest();
+      } catch (error) {
+        line('err', '✗ 初始化失败：' + error.message);
+      }
+    })();
+  </script>
+</body>
+</html>
