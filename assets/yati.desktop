@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Yati
+GenericName=Web App Runtime
+Comment=用 HTML/CSS/JS 写桌面应用，内核是 CEF（Chromium）
+Comment[en]=Write desktop apps with HTML/CSS/JS on the CEF (Chromium) runtime
+Exec=yati %U
+Icon=yati
+Terminal=false
+Categories=Development;Utility;
+StartupNotify=true
+StartupWMClass=Yati
