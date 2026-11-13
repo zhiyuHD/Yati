@@ -18,6 +18,8 @@ struct AppManifest {
   std::string name;                    // 显示名，缺省取 id
   std::string version;                 // App 自身版本
   std::string entry = "index.html";    // 入口页（相对 App 目录）
+  std::string entry_file = "index.html";  // 入口文件名（相对站点根）
+  std::string web_root;                // 站点根 = entry 所在目录，app:// 以它为根
   std::string title;                   // 窗口标题，缺省取 name
   int width = 0;                       // 0 表示用引擎默认值
   int height = 0;

@@ -1,0 +1,11 @@
+{
+  "id": "top.zhiyuhub.letstodo",
+  "name": "LetsTodo",
+  "version": "1.0.0",
+  "main": "out/index.html",
+  "window": {
+    "title": "LetsTodo",
+    "width": 760,
+    "height": 720
+  }
+}

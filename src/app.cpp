@@ -11,6 +11,7 @@
 #include "include/wrapper/cef_helpers.h"
 #include "ipc.h"
 #include "options.h"
+#include "scheme.h"
 #include "util.h"
 #include "window.h"
 
@@ -68,8 +69,23 @@ void App::OnBeforeCommandLineProcessing(
   }
 }
 
+void App::OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) {
+  // STANDARD：按站点处理（相对/绝对路径、fetch、ES module 才正常）
+  // SECURE：视为安全上下文（避免被当成不安全来源限制）
+  // CORS_ENABLED：允许同源/跨源请求走正常 CORS 流程
+  registrar->AddCustomScheme(
+      "app", CEF_SCHEME_OPTION_STANDARD | CEF_SCHEME_OPTION_SECURE |
+                 CEF_SCHEME_OPTION_CORS_ENABLED);
+}
+
 void App::OnContextInitialized() {
   CEF_REQUIRE_UI_THREAD();
+
+  // App 包模式：先把 app:// 挂上，再开窗（顺序反了首屏会 404）。
+  const Options& options = GetOptions();
+  if (!options.app_dir.empty()) {
+    RegisterAppScheme(options.web_root.empty() ? options.app_dir : options.web_root);
+  }
 
   // Create the router before the first browser so that no query can arrive
   // before a handler exists.

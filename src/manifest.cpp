@@ -83,6 +83,15 @@ bool LoadManifest(const std::string& dir, AppManifest* out) {
     out->entry = entry;
   }
 
+  // 站点根取 entry 所在目录：Next 之类的产物在 out/ 下，绝对路径 /_next/...
+  // 必须落在 out/ 里，而不是 App 根。
+  {
+    const fs::path entry_path(out->entry);
+    const std::string dir = entry_path.parent_path().string();
+    out->web_root = dir.empty() ? out->root : (root + "/" + dir);
+    out->entry_file = entry_path.filename().string();
+  }
+
   out->title = Trim(ToUtf8(dict->GetString("title")));
   if (out->title.empty()) {
     out->title = out->name;

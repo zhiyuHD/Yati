@@ -123,11 +123,18 @@ yati ./my-app          # 或 yati --app=./my-app
 - `id` 决定缓存隔离：数据落在 `~/.cache/com.example.myapp`，多个 App 互不影响
 - `main` 是入口页，可以换成 `app.html`、`dist/index.html`
 - App 通过 `yati.app.info()` 区分「App 版本」与「引擎版本」
+- 用 Next.js / Vite 也行：静态导出里的绝对路径 `/_next/...` 由引擎的 `app://` 协议在 App
+  自己的源里解析；`main` 指向子目录（如 `out/index.html`）时，站点根自动取该目录
 
 只给网页、把引擎当依赖的发行方式：App 包只装自己的静态文件 + 一行启动器，CEF 与引擎由
 `yati` 包提供，不用每个 App 塞 1.5 GB 的 Chromium。
 
-完整示例见 [`examples/hello`](examples/hello)：一个纯网页 App，覆盖了注入、文件、通知、窗口标题。
+两个跑得起来的示例：
+
+- [`examples/hello`](examples/hello)：纯 HTML，最少依赖，覆盖注入、文件、通知、窗口标题
+- [`examples/letsTodo`](examples/letsTodo)：Next.js 16 静态导出 + React 19 的 TODO 应用
+
+![LetsTodo 跑在 Yati 上](docs/letstodo.png)
 
 ## API 一眼看完
 

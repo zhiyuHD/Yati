@@ -31,6 +31,7 @@ struct Options {
   std::string app_id;
   std::string app_name;
   std::string app_version;
+  std::string web_root;         // app:// 的根目录（多数情况等于 app_dir）
 };
 
 const Options& GetOptions();

@@ -2,6 +2,7 @@
 #define YATI_APP_H_
 
 #include "include/cef_app.h"
+#include "include/cef_scheme.h"
 
 namespace yati {
 
@@ -25,6 +26,10 @@ class App : public CefApp,
   CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override {
     return this;
   }
+
+  // 注册 app:// 自定义协议（每个进程都会调用一次）。
+  void OnRegisterCustomSchemes(
+      CefRawPtr<CefSchemeRegistrar> registrar) override;
 
   // CefBrowserProcessHandler
   void OnContextInitialized() override;

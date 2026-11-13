@@ -18,6 +18,7 @@
 12. [下一步](#12-下一步)
 13. [已知问题](#13-已知问题)
 14. [App 包与引擎](#14-app-包与引擎)
+15. [app:// 协议与站点根](#15-app-协议与站点根)
 
 ---
 
@@ -304,11 +305,14 @@ App = 目录 + `yati.json`：
 | `id` | 标识 + 缓存目录名 | 目录名 |
 | `name` | 显示名 | `id` |
 | `version` | App 版本 | 空 |
-| `main` | 入口页（相对 App 目录） | `index.html` |
+| `main` | 入口页（相对 App 目录）；同时决定站点根 | `index.html` |
 | `title` / `window.title` | 窗口标题 | `name` |
 | `window.width` / `height` | 初始尺寸 | 引擎默认（1200×800） |
 
 没有 `yati.json` 的目录按「纯静态目录」处理，用 `index.html` 并打印提示。
+
+**站点根**取 `main` 所在目录：`main: "out/index.html"` 时，`app://yati/_next/...` 落到
+`<app>/out/_next/...`。Next.js 这类产物都在子目录里，绝对路径必须相对子目录解析。
 
 ### 启动路径
 
@@ -355,4 +359,61 @@ yati <dir> / --app=<dir>
 
 - 注入只发生在主 frame，iframe 里没有 `window.yati`
 - 页面脚本仍可以覆盖 `window.yati`（尚未做上下文隔离）；将来用 V8 绑定 + 隔离世界解决
-- `file://` 下的 `fetch()`、ES module、service worker 受限，`app://` 自定义协议是下一步
+- `app://` 已实现（见 §15），App 包不再走 `file://`；内置实验台页面仍是 `file://`
+
+## 15. app:// 协议与站点根
+
+### 为什么需要
+
+Next.js / Vite 的静态产物用**绝对路径**引用资源（`/_next/static/chunks/x.js`）。在
+`file://` 下，`/_next/...` 会解析成文件系统根 `file:///_next/...`，所有资源 404，
+页面看起来"白屏/没 hydrate"。给它一个真正的源就都正常了，顺带解决 ES module、
+`fetch()`、`localStorage` 这些"需要正经源"的能力。
+
+### 注册
+
+```cpp
+// 每个进程都会调用；不注册成 STANDARD 的话相对/绝对路径解析不可靠
+registrar->AddCustomScheme("app", CEF_SCHEME_OPTION_STANDARD |
+                                      CEF_SCHEME_OPTION_SECURE |
+                                      CEF_SCHEME_OPTION_CORS_ENABLED);
+
+// 浏览器进程，开第一个窗口之前
+CefRegisterSchemeHandlerFactory("app", "yati", new AppSchemeFactory(web_root));
+```
+
+顺序很关键：工厂必须在 `CreateWindow` 之前注册，否则首屏直接 404。
+
+### 资源处理
+
+`CefResourceHandler` 的实现要点：
+
+- `Open()` 里同步读文件：`handle_request = true`（不异步，省掉状态机）
+- `GetResponseHeaders()` 设置状态、MIME、长度
+- `Read()` 分块拷出（同时实现 `ReadResponse()` 兼容旧调用路径）
+- 路径穿越防护：`lexically_normal()` 之后必须仍在站点根之下
+- 目录/无扩展名路径回退到 `<path>/index.html`、`<path>.html`
+
+### 踩过的坑：MIME 不能带参数
+
+```cpp
+response->SetMimeType("text/html; charset=utf-8");   // ✗ 整页变成纯文本
+response->SetMimeType("text/html");                   // ✓
+response->SetHeaderByName("Content-Type", "text/html; charset=utf-8", true);
+```
+
+`SetMimeType` 传入带 `; charset=...` 的串时，Chromium 的类型判断匹配不上，直接回落到
+**纯文本查看器**——现象是整个 HTML 源码被当文字显示（`<body><pre>` 里一堆转义标签），
+脚本一个都不执行。网络面板里 `Content-Type` 却是对的，很容易误判。类型给基础串，
+charset 只放在 `Content-Type` 头里。
+
+### 已验证
+
+Next.js 16 静态导出（`output: 'export'`）在 `app://` 下：12–14 个 chunk 全部 200、
+React 正常 hydrate、`window.yati` 可用、零失败请求。`examples/letsTodo` 就是这条链路。
+
+### 还没做
+
+- 没有 `Range` 请求支持（大视频/音频拖动进度条会退化）
+- 没有 gzip/br 预压缩，纯靠文件读取
+- 不提供 `app://` 之外的源隔离策略（所有 App 都是 `app://yati`，靠缓存目录隔离数据）

@@ -138,6 +138,8 @@ int main(int argc, char* argv[]) {
       std::printf("[yati] 提示：%s 没有 yati.json，按静态目录处理\n",
                   manifest.root.c_str());
       manifest.entry = "index.html";
+      manifest.entry_file = "index.html";
+      manifest.web_root = manifest.root;
       manifest.name = manifest.id;
       manifest.title = manifest.id;
     }
@@ -145,6 +147,7 @@ int main(int argc, char* argv[]) {
     options.app_id = manifest.id;
     options.app_name = manifest.name;
     options.app_version = manifest.version;
+    options.web_root = manifest.web_root;
     if (!manifest.title.empty()) {
       options.title = manifest.title;
     }
@@ -155,7 +158,9 @@ int main(int argc, char* argv[]) {
       options.height = manifest.height;
     }
     if (options.url.empty()) {
-      options.url = FileUrl(manifest.root + "/" + manifest.entry);
+      // 静态站点用 app:// 提供：Next/Vite 的绝对路径（/_next/...）才能在
+      // 应用自己的源里解析，而不是落到文件系统根目录。
+      options.url = "app://yati/" + manifest.entry_file;
     }
     std::printf("[yati] 加载 App：%s %s (%s)\n", manifest.name.c_str(),
                 manifest.version.c_str(), manifest.root.c_str());
