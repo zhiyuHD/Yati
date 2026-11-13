@@ -20,7 +20,7 @@ depends=(
   'brotli' 'dav1d' 'double-conversion' 'flac' 'freetype2' 'harfbuzz' 'highway'
   'libjpeg-turbo' 'libwebp' 'libxml2' 'libxslt' 'minizip' 'openh264' 'opus' 'zstd'
 )
-makedepends=('cmake' 'ninja' 'gcc')
+makedepends=('cmake' 'ninja')
 # CEF 的包装层 220 个编译单元 + 1.4 GB 的 libcef.so，LTO 没有收益且显著拖慢构建
 options=('!lto')
 optdepends=(
@@ -42,7 +42,7 @@ source=(
   "cef.tar.bz2::$_cefurl"
 )
 sha256sums=(
-  'e4f1505816219367c7f0ce7c1b986f8866c15db3b0de2f2aca5d210f60ccdbf5'
+  'c460e4ed92bdd2246fb9a177ead89e92a14cc7ace58be03bd43b6e797c726a92'
   '7b53123d0628fce62c755c090b0ae52b454431d98b53b8d99fb505757f48f43a'
 )
 
@@ -60,6 +60,11 @@ prepare() {
 }
 
 build() {
+  # CEF 包装层把 __FILE__ 编译进了二进制（日志/断言用），会带上 $srcdir 绝对路径。
+  # 按 Arch 惯例映射到 /usr/src/debug，既消除路径泄露，也保留调试定位。
+  export CFLAGS="${CFLAGS} -ffile-prefix-map=$srcdir=/usr/src/debug/$pkgname"
+  export CXXFLAGS="${CXXFLAGS} -ffile-prefix-map=$srcdir=/usr/src/debug/$pkgname"
+
   cmake -S "$_srcdir" -B build \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
