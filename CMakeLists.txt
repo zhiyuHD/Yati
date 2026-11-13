@@ -92,9 +92,12 @@ target_compile_definitions(yati PRIVATE YATI_VERSION="${YATI_VERSION}")
 target_link_directories(yati PRIVATE "${CEF_BINARY_DIR}")
 target_link_libraries(yati PRIVATE libcef_dll_wrapper cef ${CEF_STANDARD_LIBS})
 
+# 只用 $ORIGIN 作为 RPATH，且让构建产物直接带 INSTALL_RPATH：
+# 否则 CMake 会把 ${CEF_BINARY_DIR} 这种绝对路径写进 RUNPATH，打进包就是
+# "insecure RUNPATH"（namcap E 级问题），也会泄露构建机路径。
 set_target_properties(yati PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${YATI_BIN_DIR}"
-  BUILD_RPATH "$ORIGIN"
+  BUILD_WITH_INSTALL_RPATH TRUE
   INSTALL_RPATH "$ORIGIN")
 
 # Stage the CEF runtime next to the executable. Symlinks are used on purpose:

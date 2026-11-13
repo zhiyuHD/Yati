@@ -25,3 +25,10 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
+
+# AUR 构建产物（源码由 PKGBUILD 下载，包文件不进仓库）
+packaging/aur/src/
+packaging/aur/pkg/
+packaging/aur/*.pkg.tar.*
+packaging/aur/*.tar.*
+packaging/aur/.SRCINFO
