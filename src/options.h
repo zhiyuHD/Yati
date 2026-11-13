@@ -24,6 +24,13 @@ struct Options {
   bool inspect = false;         // Expose the DevTools protocol.
   int inspect_port = kDefaultInspectPort;
   bool verbose = false;
+
+  // App 包模式（yati <dir> / --app=<dir>）：非空表示运行第三方 App，
+  // 而不是内置页面。缓存目录会按 app_id 隔离。
+  std::string app_dir;
+  std::string app_id;
+  std::string app_name;
+  std::string app_version;
 };
 
 const Options& GetOptions();

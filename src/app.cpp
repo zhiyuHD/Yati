@@ -1,12 +1,52 @@
 #include "app.h"
 
+#include <cstdio>
+#include <fstream>
+#include <iterator>
+#include <string>
+
 #include "include/cef_command_line.h"
+#include "include/cef_path_util.h"
+#include "include/cef_v8.h"
 #include "include/wrapper/cef_helpers.h"
 #include "ipc.h"
 #include "options.h"
+#include "util.h"
 #include "window.h"
 
 namespace yati {
+
+namespace {
+
+// 每个渲染进程读一次 webui/preload.js，随后在每个主 frame 的上下文里同步求值。
+// 引擎注入而不是让页面自己 <script src>，这样 App 只需要写网页，也减少页面
+// 忘引、引错路径的可能。
+const std::string& PreloadScript() {
+  static std::string script;
+  static bool loaded = false;
+  if (loaded) {
+    return script;
+  }
+  loaded = true;
+
+  CefString exe_dir;
+  if (!CefGetPath(PK_DIR_EXE, exe_dir)) {
+    return script;
+  }
+  const std::string path = ToUtf8(exe_dir) + "/webui/preload.js";
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) {
+    std::fprintf(stderr,
+                 "[yati] 警告：找不到 %s，页面需要自行引入 JS 桥\n",
+                 path.c_str());
+    return script;
+  }
+  script.assign(std::istreambuf_iterator<char>(stream),
+                std::istreambuf_iterator<char>());
+  return script;
+}
+
+}  // namespace
 
 void App::OnBeforeCommandLineProcessing(
     const CefString& process_type,
@@ -44,6 +84,25 @@ void App::OnContextCreated(CefRefPtr<CefBrowser> browser,
                            CefRefPtr<CefV8Context> context) {
   // Installs window.cefQuery / window.cefQueryCancel into the new context.
   Ipc::Get()->renderer_router()->OnContextCreated(browser, frame, context);
+
+  if (!context || !frame || !frame->IsMain()) {
+    return;
+  }
+
+  // window.yati：在页面脚本之前同步执行（ExecuteJavaScript 是异步的，会晚于
+  // 页面内联脚本，App 在加载阶段就用不了 API）。
+  const std::string& script = PreloadScript();
+  if (script.empty()) {
+    return;
+  }
+  CefRefPtr<CefV8Value> retval;
+  CefRefPtr<CefV8Exception> exception;
+  const bool ok = context->Eval(ToCef(script), ToCef("yati://preload.js"), 0,
+                                retval, exception);
+  if (!ok) {
+    std::fprintf(stderr, "[yati] 注入 JS 桥失败：%s\n",
+                 exception ? ToUtf8(exception->GetMessage()).c_str() : "unknown");
+  }
 }
 
 void App::OnContextReleased(CefRefPtr<CefBrowser> browser,

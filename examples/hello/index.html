@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Hello Yati</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0; padding: 40px;
+      font-family: system-ui, -apple-system, "Noto Sans CJK SC", sans-serif;
+      background: #14161a; color: #e6e8eb;
+    }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    .sub { color: #7d8590; font-size: 13px; margin-bottom: 26px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 22px; }
+    .card { background: #1b1e24; border: 1px solid #262b33; border-radius: 10px; padding: 14px; }
+    .k { font-size: 11px; color: #7d8590; text-transform: uppercase; letter-spacing: .6px; }
+    .v { margin-top: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; word-break: break-all; }
+    button {
+      background: #21262d; color: #e6e8eb; border: 1px solid #30363d;
+      border-radius: 7px; padding: 8px 14px; font-size: 13px; cursor: pointer; margin: 0 8px 8px 0;
+    }
+    button:hover { background: #282f38; }
+    pre {
+      background: #1b1e24; border: 1px solid #262b33; border-radius: 10px;
+      padding: 14px; height: 150px; overflow: auto; font-size: 12.5px; margin: 0;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hello Yati</h1>
+  <div class="sub">这是一个只提供网页的 App —— 没有 C++ 代码，也没有引用 preload.js，JS 桥由引擎注入。</div>
+
+  <div class="grid">
+    <div class="card"><div class="k">App</div><div class="v" id="app">—</div></div>
+    <div class="card"><div class="k">App 版本</div><div class="v" id="app-version">—</div></div>
+    <div class="card"><div class="k">引擎</div><div class="v" id="engine">—</div></div>
+    <div class="card"><div class="k">缓存隔离</div><div class="v" id="userdata">—</div></div>
+  </div>
+
+  <div>
+    <button id="write">写文件到临时目录</button>
+    <button id="notify">发系统通知</button>
+    <button id="title">改窗口标题</button>
+  </div>
+
+  <pre id="log"></pre>
+
+  <script>
+    const logView = document.getElementById('log');
+    const log = (text) => {
+      logView.textContent += `[${new Date().toLocaleTimeString()}] ${text}\n`;
+      logView.scrollTop = logView.scrollHeight;
+    };
+
+    // 页面加载阶段就调用 API：如果引擎注入晚于页面脚本，这里会抛错。
+    (async () => {
+      try {
+        const info = await yati.app.info();
+        const paths = await yati.app.paths();
+        document.getElementById('app').textContent = info.app.name;
+        document.getElementById('app-version').textContent = info.app.version;
+        document.getElementById('engine').textContent = info.engine.name + ' ' + info.engine.version;
+        document.getElementById('userdata').textContent = paths.userData;
+        log(`App: ${info.app.id} · bundled=${info.app.bundled}`);
+        log(`API 在加载阶段即可用，window.yati 由引擎注入 ✓`);
+      } catch (error) {
+        log('初始化失败：' + error.message);
+      }
+    })();
+
+    document.getElementById('write').addEventListener('click', async () => {
+      try {
+        const dir = await yati.fs.tempDir();
+        const file = dir + '/hello-yati.txt';
+        await yati.fs.writeText(file, 'written by a Yati app at ' + new Date().toISOString());
+        log('已写入 ' + file);
+        log('读回：' + (await yati.fs.readText(file)));
+      } catch (error) {
+        log('失败：' + error.message);
+      }
+    });
+
+    document.getElementById('notify').addEventListener('click', async () => {
+      try {
+        await yati.notify.send('Hello Yati', '来自一个纯网页 App 的通知');
+        log('通知已发送');
+      } catch (error) {
+        log('失败：' + error.message);
+      }
+    });
+
+    document.getElementById('title').addEventListener('click', async () => {
+      const title = 'Hello Yati · ' + new Date().toLocaleTimeString();
+      await yati.window.setTitle(title);
+      log('窗口标题改为：' + title);
+    });
+  </script>
+</body>
+</html>

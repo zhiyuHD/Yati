@@ -71,6 +71,7 @@ add_executable(yati
   src/client.cpp
   src/ipc.cpp
   src/process.cpp
+  src/manifest.cpp
   src/api/api.cpp
   src/api/core_api.cpp
   src/api/fs_api.cpp

@@ -16,6 +16,7 @@
 #include "include/cef_version.h"
 #include "include/wrapper/cef_helpers.h"
 #include "ipc.h"
+#include "options.h"
 #include "process.h"
 #include "util.h"
 #include "version.h"
@@ -188,6 +189,25 @@ CefRefPtr<CefDictionaryValue> AppInfo() {
     info->SetString("kernel", uts.release);
   }
   info->SetBool("wayland", IsWayland());
+
+  // App 包模式下这些字段来自 yati.json；内置页面运行时回落为引擎自身。
+  const Options& options = GetOptions();
+  CefRefPtr<CefDictionaryValue> app = CefDictionaryValue::Create();
+  app->SetString("id", options.app_id.empty() ? YATI_APP_ID : options.app_id);
+  app->SetString("name",
+                 options.app_name.empty() ? YATI_PRODUCT_NAME : options.app_name);
+  app->SetString("version",
+                 options.app_version.empty() ? YATI_VERSION : options.app_version);
+  app->SetBool("bundled", !options.app_dir.empty());
+  app->SetString("path", options.app_dir);
+  info->SetDictionary("app", app);
+
+  // 引擎自身版本（App 版本在上面的 app 字典里）。
+  CefRefPtr<CefDictionaryValue> engine = CefDictionaryValue::Create();
+  engine->SetString("name", YATI_PRODUCT_NAME);
+  engine->SetString("version", YATI_VERSION);
+  info->SetDictionary("engine", engine);
+
   return info;
 }
 
@@ -207,6 +227,7 @@ void RegisterCoreApi(Registry* registry) {
     paths->SetString("cwd", PathFor(PK_DIR_CURRENT));
     paths->SetString("exe", PathFor(PK_FILE_EXE));
     paths->SetString("resources", PathFor(PK_DIR_RESOURCES));
+    paths->SetString("app", GetOptions().app_dir);
     call->Resolve(paths);
   });
 

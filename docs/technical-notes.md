@@ -17,6 +17,7 @@
 11. [打包注意](#11-打包注意)
 12. [下一步](#12-下一步)
 13. [已知问题](#13-已知问题)
+14. [App 包与引擎](#14-app-包与引擎)
 
 ---
 
@@ -280,3 +281,78 @@ node scripts/check-api.mjs      # 退出码 0 表示全部通过
 - 早期版本启动时见过一次连续 6 条 `*** stack smashing detected ***`（进程存活、功能正常），此后多次
   复跑未复现，未能定位。
 - 无 `/dev/dri` 的环境会打印 `drmGetDevices2()` 错误，属正常降级，加 `--disable-gpu` 即可。
+
+## 14. App 包与引擎
+
+### 形态
+
+App = 目录 + `yati.json`：
+
+```json
+{
+  "id": "com.example.myapp",
+  "name": "My App",
+  "version": "1.0.0",
+  "main": "index.html",
+  "title": "My App",
+  "window": { "title": "My App", "width": 900, "height": 600 }
+}
+```
+
+| 字段 | 用途 | 缺省 |
+| --- | --- | --- |
+| `id` | 标识 + 缓存目录名 | 目录名 |
+| `name` | 显示名 | `id` |
+| `version` | App 版本 | 空 |
+| `main` | 入口页（相对 App 目录） | `index.html` |
+| `title` / `window.title` | 窗口标题 | `name` |
+| `window.width` / `height` | 初始尺寸 | 引擎默认（1200×800） |
+
+没有 `yati.json` 的目录按「纯静态目录」处理，用 `index.html` 并打印提示。
+
+### 启动路径
+
+```
+yati <dir> / --app=<dir>
+  → manifest.LoadManifest()      读 yati.json，填 Options{app_dir, app_id, app_name, app_version, title, width, height}
+  → Options.url = file://<dir>/<main>
+  → root_cache_path = ~/.cache/<app_id>     ← 缓存按 App 隔离
+  → CefInitialize → OnContextInitialized → CreateWindow()
+```
+
+### JS 桥注入
+
+引擎在**渲染进程**的 `OnContextCreated` 里把 `webui/preload.js` 同步求值进主 frame 的上下文
+（`CefV8Context::Eval`，不是 `ExecuteJavaScript`——后者是异步的，会晚于页面内联脚本，
+导致 App 在加载阶段用不了 API）。脚本只读一次并缓存在渲染进程内。
+
+因此 App 的 HTML **不需要** `<script src="preload.js">`；如果写了也无妨，脚本开头有
+`if (window.yati) return;` 兜底。注入失败（例如 `webui/preload.js` 缺失）会打印警告并退化为
+「页面自行引入」。
+
+### 与 API 的对应
+
+`app.info()` 返回两个版本，避免混淆「App 版本」和「引擎版本」：
+
+```json
+{
+  "name": "Yati", "version": "0.3.0",
+  "app":    { "id": "com.example.myapp", "name": "My App", "version": "1.0.0", "bundled": true, "path": "/path/to/my-app" },
+  "engine": { "name": "Yati", "version": "0.3.0" }
+}
+```
+
+`app.paths().app` 是 App 目录（内置页面时为空串）。
+
+### 分发
+
+- 引擎包：`yati`（AUR），装 `/usr/lib/yati`（引擎 + CEF 运行时 + `webui/preload.js`）
+- App 包：只装静态文件到 `/usr/share/<app>`，启动器 `exec yati /usr/share/<app>`；`depends=('yati')`
+
+这样升级 CEF 只需要升引擎包，所有 App 一起受益，也不用每个 App 各背 1.5 GB。
+
+### 已知限制
+
+- 注入只发生在主 frame，iframe 里没有 `window.yati`
+- 页面脚本仍可以覆盖 `window.yati`（尚未做上下文隔离）；将来用 V8 绑定 + 隔离世界解决
+- `file://` 下的 `fetch()`、ES module、service worker 受限，`app://` 自定义协议是下一步

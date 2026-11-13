@@ -21,6 +21,23 @@ interface YatiError extends Error {
   channel?: string;
 }
 
+/** 当前运行的 App（App 包模式下来自 yati.json）。 */
+interface YatiAppIdentity {
+  /** 唯一标识，缺省取目录名；同时用作缓存目录。 */
+  id: string;
+  name: string;
+  version: string;
+  /** true 表示通过 yati <dir> 运行的 App 包，false 表示内置页面。 */
+  bundled: boolean;
+  /** App 目录（绝对路径）。 */
+  path: string;
+}
+
+interface YatiAppEngine {
+  name: string;
+  version: string;
+}
+
 interface YatiAppInfo {
   name: string;
   version: string;
@@ -32,10 +49,16 @@ interface YatiAppInfo {
   arch?: string;
   kernel?: string;
   wayland: boolean;
+  /** 当前 App 的身份。 */
+  app: YatiAppIdentity;
+  /** 引擎自身（版本与 App 版本分开报）。 */
+  engine: YatiAppEngine;
 }
 
 interface YatiAppPaths {
   home: string;
+  /** App 目录；内置页面运行时为空串。 */
+  app: string;
   userData: string;
   temp: string;
   cwd: string;

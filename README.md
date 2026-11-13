@@ -95,6 +95,40 @@ build/bin/yati            # 打开内置实验台
 
 用 TypeScript 的话，把 `types/yati.d.ts` 加进 `include`，`yati.*` 就有完整补全，不需要打包器或 import。
 
+## 把 Yati 当引擎用
+
+Yati 本身就是一个引擎。写一个基于 Yati 的 App，不需要碰 C++，只要一个目录：
+
+```
+my-app/
+├── yati.json      # 清单
+└── index.html     # 你的网页
+```
+
+```json
+{
+  "id": "com.example.myapp",
+  "name": "My App",
+  "version": "1.0.0",
+  "main": "index.html",
+  "window": { "title": "My App", "width": 900, "height": 600 }
+}
+```
+
+```bash
+yati ./my-app          # 或 yati --app=./my-app
+```
+
+- `window.yati` 由**引擎注入**，App 的 HTML 里不用引 `preload.js`，而且在页面脚本执行前就可用
+- `id` 决定缓存隔离：数据落在 `~/.cache/com.example.myapp`，多个 App 互不影响
+- `main` 是入口页，可以换成 `app.html`、`dist/index.html`
+- App 通过 `yati.app.info()` 区分「App 版本」与「引擎版本」
+
+只给网页、把引擎当依赖的发行方式：App 包只装自己的静态文件 + 一行启动器，CEF 与引擎由
+`yati` 包提供，不用每个 App 塞 1.5 GB 的 Chromium。
+
+完整示例见 [`examples/hello`](examples/hello)：一个纯网页 App，覆盖了注入、文件、通知、窗口标题。
+
 ## API 一眼看完
 
 | 模块 | 常用调用 |

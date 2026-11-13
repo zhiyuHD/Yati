@@ -1,0 +1,11 @@
+{
+  "id": "top.zhiyuhub.hello",
+  "name": "Hello Yati",
+  "version": "1.0.0",
+  "main": "index.html",
+  "window": {
+    "title": "Hello Yati",
+    "width": 900,
+    "height": 600
+  }
+}

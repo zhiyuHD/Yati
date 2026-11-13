@@ -8,6 +8,7 @@
 #include "include/cef_version.h"
 
 #include "app.h"
+#include "manifest.h"
 #include "options.h"
 #include "util.h"
 #include "version.h"
@@ -52,6 +53,11 @@ void ParseCommandLine(int argc, char* argv[]) {
       g_options.disable_gpu = true;
     } else if (argument == "--inspect") {
       g_options.inspect = true;
+    } else if (StartsWith(argument, "--app=")) {
+      g_options.app_dir = ValueOf(argument);
+    } else if (!argument.empty() && argument[0] != '-' && g_options.app_dir.empty()) {
+      // 位置参数：yati <app-dir>
+      g_options.app_dir = argument;
     } else if (StartsWith(argument, "--inspect-port=")) {
       g_options.inspect = true;
       g_options.inspect_port = IntOf(argument, g_options.inspect_port);
@@ -78,16 +84,32 @@ void SetOptions(const Options& options) {
 // CEF warns loudly (and may share a singleton with an unrelated app) when
 // root_cache_path is left at the default. Give the framework its own cache
 // directory under the XDG cache home.
-std::string ResolveCacheRoot() {
+std::string ResolveCacheRoot(const std::string& app_id) {
+  const std::string leaf = app_id.empty() ? std::string(YATI_APP_ID) : app_id;
   const char* xdg_cache = std::getenv("XDG_CACHE_HOME");
   if (xdg_cache && *xdg_cache) {
-    return std::string(xdg_cache) + "/" + YATI_APP_ID;
+    return std::string(xdg_cache) + "/" + leaf;
   }
   const char* home = std::getenv("HOME");
   if (home && *home) {
-    return std::string(home) + "/.cache/" + YATI_APP_ID;
+    return std::string(home) + "/.cache/" + leaf;
   }
-  return std::string("/tmp/") + YATI_APP_ID + "-cache";
+  return std::string("/tmp/") + leaf + "-cache";
+}
+
+// 把本地路径转成 file:// URL（只处理会破坏 URL 的字符）。
+std::string FileUrl(const std::string& path) {
+  std::string out = "file://";
+  for (const char c : path) {
+    switch (c) {
+      case ' ': out += "%20"; break;
+      case '%': out += "%25"; break;
+      case '#': out += "%23"; break;
+      case '?': out += "%3F"; break;
+      default: out += c;
+    }
+  }
+  return out;
 }
 
 int main(int argc, char* argv[]) {
@@ -104,6 +126,41 @@ int main(int argc, char* argv[]) {
   ParseCommandLine(argc, argv);
   yati::Options options = yati::GetOptions();
 
+  // App 包模式：读 <dir>/yati.json，窗口与入口都来自 App 自己。
+  if (!options.app_dir.empty()) {
+    yati::AppManifest manifest;
+    if (!yati::LoadManifest(options.app_dir, &manifest)) {
+      if (manifest.root.empty()) {
+        std::fprintf(stderr, "[yati] 无法打开 App 目录：%s\n", options.app_dir.c_str());
+        return 1;
+      }
+      // 目录在但没有 yati.json：按「纯静态目录」处理，用 index.html。
+      std::printf("[yati] 提示：%s 没有 yati.json，按静态目录处理\n",
+                  manifest.root.c_str());
+      manifest.entry = "index.html";
+      manifest.name = manifest.id;
+      manifest.title = manifest.id;
+    }
+    options.app_dir = manifest.root;
+    options.app_id = manifest.id;
+    options.app_name = manifest.name;
+    options.app_version = manifest.version;
+    if (!manifest.title.empty()) {
+      options.title = manifest.title;
+    }
+    if (manifest.width > 0) {
+      options.width = manifest.width;
+    }
+    if (manifest.height > 0) {
+      options.height = manifest.height;
+    }
+    if (options.url.empty()) {
+      options.url = FileUrl(manifest.root + "/" + manifest.entry);
+    }
+    std::printf("[yati] 加载 App：%s %s (%s)\n", manifest.name.c_str(),
+                manifest.version.c_str(), manifest.root.c_str());
+  }
+
   if (options.url.empty()) {
     CefString exe_dir;
     if (!CefGetPath(PK_DIR_EXE, exe_dir)) {
@@ -114,7 +171,7 @@ int main(int argc, char* argv[]) {
   }
   yati::SetOptions(options);
 
-  const std::string cache_root = ResolveCacheRoot();
+  const std::string cache_root = ResolveCacheRoot(options.app_id);
   std::error_code fs_error;
   std::filesystem::create_directories(cache_root, fs_error);
 
